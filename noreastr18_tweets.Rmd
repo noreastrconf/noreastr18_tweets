@@ -1,0 +1,423 @@
+---
+title: "USIALE 2018 Tweets"
+author: Jeff Hollister (borrowed from François Michonneau)
+output:
+   html_document:
+     toc: true
+---
+
+```{r setup, echo=FALSE, output="hide"}
+library(wesanderson)
+library(tidyverse)
+library(stringr)
+library(magick)
+library(tidytext)
+library(widyr)
+library(rvest)
+
+"print.magick-image" <- function(x, ...){
+  ext <- ifelse(length(x), tolower(image_info(x[1])$format), "gif")
+  tmp <- tempfile(fileext = paste0(".", ext))
+  image_write(x, path = tmp)
+  knitr::include_graphics(tmp)
+}
+```
+
+
+```{r update_tweets, echo=FALSE}
+
+load("usiale2018.rda")
+
+```
+
+```{r tweet-data, echo=FALSE}
+load("usiale2018.rda")
+tw <- usiale2018 %>%
+  distinct(status_id, .keep_all = TRUE)
+
+```
+
+## About this document
+
+This document was generated using RMarkdown, and the source is available on
+GitHub at:
+[https://github.com/fmichonneau/evol2017-tweets](https://github.com/fmichonneau/evol2017-tweets).
+
+Pull requests to add other figures or fix bugs are welcome.
+
+This document (and associated code) is released under a CC0 licence.
+
+If you have questions or comments, I am on twitter at
+[fmic_](https://twitter.com/fmic_) or by email at [francois.michonneau@gmail.com](mailto:francois.michonneau@gmail.com)
+
+
+## Basic summary
+
+* Total number of tweets with the #Evol2017 hashtag between `r range(tw$created_at)[1]`, and `r range(tw$created_at)[2]`: `r nrow(tw)`
+* Total of original tweets (no retweets): `r sum(!tw$is_retweet)`.
+* Number of users who tweeted: `r length(unique(tw$screen_name))`.
+
+
+## The 5 most favorited tweets
+
+```{r top-fav, echo=FALSE, results='asis'}
+top_fav <- tw %>%
+    filter(!is_retweet) %>%
+    top_n(5, favorite_count) %>%
+    arrange(desc(favorite_count))
+
+render_tweet <- function(dt, row) {
+    screen_name <- dt$screen_name[i]
+    id <- format(dt$status_id[i], scientific = FALSE)
+    txt <- dt$text[i]
+    created <- format(dt$created_at[i], "%Y-%m-%d")
+    n_fav <- dt$favorite_count[i]
+    n_retweets <- dt$retweet_count[i]
+    cat("<blockquote class=\"twitter-tweet\" lang=\"en\"> \n",
+        "<p lang=\"en\" dir=\"ltr\">",
+        txt,
+        "</p>&mdash; ",
+        "<a href=\"https://twitter.com/", screen_name, "\">", screen_name, "</a>", "&nbsp;|&nbsp;",
+        "<a href=\"https://twitter.com/",
+        screen_name, "/status/", id, "\"> ", created, "</a> &nbsp;|&nbsp;",
+        n_retweets, " retweets, ",  n_fav, " favorites. </blockquote>",
+        "\n \n",
+        sep = "")
+}
+
+for (i in seq_len(nrow(top_fav))) {
+    render_tweet(top_fav, i)
+}
+
+
+```
+
+
+## The 5 most retweeted tweets
+
+```{r top-rt, echo=FALSE, results='asis'}
+top_rt <- tw %>%
+    filter(!is_retweet) %>%
+    top_n(5, retweet_count)  %>%
+    arrange(desc(retweet_count))
+
+for (i in seq_len(nrow(top_fav))) {
+    render_tweet(top_rt, i)
+}
+
+```
+
+## Top tweeters
+
+All generated tweets (including retweets)
+
+```{r top-users-all, echo=FALSE, fig.height=10, fig.width=8}
+top_users <- tw %>%
+    group_by(screen_name) %>%
+    summarize(total_tweets = n(),
+              retweet = sum(is_retweet),
+              original = sum(!is_retweet)) %>%
+    top_n(30, total_tweets) %>%
+    gather(type, n_tweets, -screen_name, -total_tweets)
+
+top_users$screen_name <- reorder(top_users$screen_name,
+                                 top_users$total_tweets,
+                                 function(x) sum(x))
+
+ggplot(top_users) + geom_bar(aes(x = screen_name, y = n_tweets, fill = type),
+                             stat = "identity") +
+  ylab("Number of tweets") + xlab("User") +
+  coord_flip() +
+  scale_fill_manual(values = wes_palette("Zissou")[c(1, 3)]) +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+```
+
+Only for original tweets (retweets excluded)
+
+```{r, top-users-orig, echo=FALSE, fig.height=10}
+top_orig_users <- tw %>% group_by(screen_name) %>%
+    summarize(total_tweets = n(),
+              Retweet = sum(is_retweet),
+              Original = sum(!is_retweet)) %>%
+    top_n(30, Original)
+
+top_orig_users$screen_name <- reorder(top_orig_users$screen_name,
+                                     top_orig_users$Original,
+                                     function(x) sum(x))
+
+ggplot(top_orig_users) + geom_bar(aes(x = screen_name, y = Original), stat = "identity",
+                                  fill = wes_palette("Zissou", 1)) +
+  ylab("Number of tweets") + xlab("User") +
+  coord_flip() +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+
+```
+
+
+## Most favorited/retweeted users
+
+The figures below only include users who tweeted 5+ times, and don't include
+retweets.
+
+### Number of favorites received by users
+
+```{r, fig.height=10, echo=FALSE}
+impact <- tw %>%
+    filter(!is_retweet) %>%
+    group_by(screen_name) %>%
+    summarize(n_tweets = n(),
+              n_fav = sum(favorite_count),
+              n_rt =  sum(retweet_count),
+              mean_fav = mean(favorite_count),
+              mean_rt = mean(retweet_count)) %>%
+    filter(n_tweets >=  5)
+
+### Most favorited
+most_fav <- impact %>%
+    top_n(30, n_fav)
+
+most_fav$screen_name <- reorder(most_fav$screen_name,
+                               most_fav$n_fav,
+                               sort)
+
+ggplot(most_fav) +
+    geom_bar(aes(x = screen_name, y = n_fav),
+             stat = "identity", fill = wes_palette("Zissou")[2]) +
+  coord_flip() + xlab("User") + ylab("Total number of favorites") +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+```
+
+### Number of retweets received by users
+
+```{r, fig.height=10, echo=FALSE}
+## Most retweeted
+
+most_rt <- impact %>%
+    top_n(30, n_rt)
+
+most_rt$screen_name <- reorder(most_rt$screen_name,
+                              most_rt$n_rt,
+                              sort)
+
+ggplot(most_rt) +
+    geom_bar(aes(x = screen_name, y = n_rt),
+             stat = "identity", fill =  wes_palette("Zissou")[5]) +
+  coord_flip() + xlab("User") + ylab("Total number of retweets") +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+```
+
+### Mean numbers of favorites received
+
+```{r, fig.height=10, echo=FALSE}
+
+### Mean favorites
+
+hi_mean_fav <- impact %>%
+    top_n(30, mean_fav)
+
+hi_mean_fav$screen_name <- reorder(hi_mean_fav$screen_name,
+                                  hi_mean_fav$mean_fav,
+                                  sort)
+
+ggplot(hi_mean_fav) +
+    geom_bar(aes(x = screen_name, y = mean_fav),
+             stat = "identity", fill = wes_palette("Zissou")[2]) +
+  coord_flip() + xlab("User") + ylab("Number of favorites / tweets") +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+
+```
+
+### Mean numbers of retweets received
+
+```{r, fig.height=10, echo=FALSE}
+
+### Mean retweets
+
+hi_mean_rt <- impact %>%
+    top_n(30, mean_rt)
+
+hi_mean_rt$screen_name <- reorder(hi_mean_rt$screen_name,
+                                 hi_mean_rt$mean_rt,
+                                 sort)
+
+ggplot(hi_mean_rt) + geom_bar(aes(x = screen_name, y = mean_rt),
+                           stat = "identity", fill = wes_palette("Zissou")[5]) +
+  coord_flip() + xlab("User") + ylab("Number of retweets / tweets") +
+  theme(axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12))
+
+
+```
+
+## Word cloud
+
+The top 100 words among the original tweets.
+
+```{r word-cloud, echo=FALSE, fig.height=8, fig.width=8, cache=TRUE}
+library(wordcloud)
+
+pal <- wes_palette("Darjeeling", 8, type = "continuous")
+
+tw_text_cleanup <- function(x) {
+    x %>%
+        gsub("(@|\\#)\\w+", "", .) %>%   # remove mentions/hashtags
+        gsub("https?\\:\\/\\/\\w+\\.\\w+(\\/\\w+)*", "", .) %>% #remove urls
+        gsub("\\bthe\\b", "", .) %>% # remove the
+        gsub("amp", "", .) %>%  ## remove &
+        gsub("\\bspp\\b", "species", .) %>% ## replace spp by species
+        gsub('\\p{So}|\\p{Cn}', '', ., perl = TRUE)
+}
+
+tw %>%
+    filter(!is_retweet) %>%
+    .$text %>% paste(collapse = "") %>%
+    gsub("(@|\\#)\\w+", "", .) %>%   # remove mentions/hashtags
+    gsub("https?\\:\\/\\/\\w+\\.\\w+(\\/\\w+)*", "", .) %>% #remove urls
+    gsub("\\bthe\\b", "", .) %>% # remove the
+    gsub("amp", "", .) %>%  ## remove &
+    gsub("\\bspp\\b", "species", .) %>% ## replace spp by species
+    gsub('\\p{So}|\\p{Cn}', '', ., perl = TRUE) %>%
+    wordcloud(max.words = 100, colors = pal, random.order = FALSE, scale = c(3, .7))
+
+```
+
+## Most used emojis
+
+
+```{r emoji-prep, cache=TRUE, echo=FALSE}
+## Save this page locally: https://unicodey.com/emoji-data/table.htm
+
+emodict <- read_html("Emoji Catalog.htm") %>%
+    html_table() %>%
+    .[[1]]
+names(emodict) <- make.unique(names(emodict))
+
+emodict <- emodict %>%
+    select_if(is.character) %>%
+    rename(glyph = Name.6,
+           long_name = Name.7)
+```
+
+```{r emoji, echo=FALSE, eval=FALSE}
+## inspired by: http://livefreeordichotomize.com/2017/07/17/ropensci-slack-emojis/
+emojis <- tw$text %>%
+    str_extract_all("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+") %>%
+    unlist() %>%
+    str_split("") %>% unlist() %>%
+    table() %>% sort(decreasing = TRUE) %>% as_tibble() %>%
+    set_names(c("glyph", "freq") ) %>%
+    filter( ! str_detect(glyph, "^[-[:space:]]" ) ) %>%
+    left_join(emodict, by = "glyph") %>%
+    filter(!is.na(long_name)) %>%
+    top_n(15, freq) %>%
+    mutate(emoji_png = file.path("Emoji Catalog_files", Image))
+
+render_row_emoji <- function(emoji_png, freq) {
+    emos <- rep(emoji_png, freq)
+    ## we add a transparent square of the same size of the emoji
+    ## (so we don't need to scale), to have room to display the number
+    ## of times it is represented
+    emos <- c(emos, "transparent-64x64.png")
+    loc_str <- paste0("+", 64*freq, "+0")
+    image_read(emos) %>%
+        image_scale("x64") %>%
+        image_append() %>%
+        image_background("white", flatten = FALSE) %>%
+        image_annotate(as.character(freq), gravity = "west",
+                       location = loc_str, size = 45, color = "black")
+}
+
+render_plot <- function(bars, path) {
+    do.call("c", bars) %>%
+        image_append(stack = TRUE) %>%
+        image_background("white", flatten = FALSE)
+}
+
+emojis %>%
+    dplyr::select(emoji_png, freq) %>%
+    purrr::pmap(render_row_emoji) %>%
+    render_plot
+
+ ```
+
+
+## Most commonly associated words
+
+
+```{r word-pairs, echo=FALSE, fig.width=10}
+## From: http://tidytextmining.com/nasa.html#word-co-ocurrences-and-correlations
+evo_stop_words <- data_frame(word = c("evol2017", "rt", "https", "t.co",
+                    "amp"))
+
+tw_word <- tw %>%
+    distinct(status_id, .keep_all = TRUE) %>%
+    filter(!is_retweet) %>%
+    mutate(text = tw_text_cleanup(text)) %>%
+    unnest_tokens(word, text) %>%
+    anti_join(stop_words, by = "word") %>%
+    anti_join(evo_stop_words, by = "word") %>%
+    filter(!grepl("^[0-9]+$", word))
+
+#tw_word %>%
+#    count(word, sort = TRUE)
+
+tw_word_pairs <- tw_word %>%
+    pairwise_count(word, status_id, sort = TRUE, upper = FALSE)
+
+
+library(ggplot2)
+library(igraph)
+library(ggraph)
+
+set.seed(1234)
+
+tw_word_pairs %>%
+  filter(n >= 10) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4") +
+  geom_node_point(size = 5) +
+  geom_node_text(aes(label = name), repel = TRUE,
+                 point.padding = unit(0.2, "lines")) +
+  theme_void()
+
+```
+
+## Sentiment analysis
+
+
+Very little negativity in the #Evol2017 tweets. Most positive before lunch, and in the evening.
+
+
+```{r sentiment, echo=FALSE}
+## from: http://tidytextmining.com/sentiment.html#sentiment-analysis-with-inner-join
+library(lubridate)
+
+tw_words_all  <- tw %>%
+    distinct(status_id, .keep_all = TRUE) %>%
+    filter(!is_retweet, created_at > as.Date("2017-06-24")) %>%
+    mutate(minutes = as.numeric(difftime(created_at, min(.$created_at),
+                                         units = "mins")),
+           day = as.integer(difftime(created_at, min(.$created_at),
+                                     units = "days"))) %>%
+    mutate(text = tw_text_cleanup(text))
+
+tw_words <- tw_words_all %>%
+    unnest_tokens(word, text) %>%
+    inner_join(get_sentiments("bing"), by="word") %>%
+    count(day, index = minutes %/% 120, sentiment) %>%
+    spread(sentiment, n, fill = 0) %>%
+    mutate(sentiment = positive - negative)
+
+tw_words %>%
+    mutate(time=minutes(index)*120 + min(tw_words_all$created_at)) %>%
+    ggplot(aes(time, sentiment, fill = as.factor(day))) +
+    geom_col() +
+	theme(legend.position = "none")
+
+```
