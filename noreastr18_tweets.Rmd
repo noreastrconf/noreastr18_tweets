@@ -26,13 +26,13 @@ library(rvest)
 
 ```{r update_tweets, echo=FALSE}
 
-load("noreastr2018.rda")
+load("noreastr18.rda")
 
 ```
 
 ```{r tweet-data, echo=FALSE}
-load("noreastr2018.rda")
-tw <- noreastr2018 %>%
+load("noreastr18.rda")
+tw <- noreastr18 %>%
   distinct(status_id, .keep_all = TRUE)
 
 ```
@@ -128,7 +128,7 @@ ggplot(top_users) + geom_bar(aes(x = screen_name, y = n_tweets, fill = type),
                              stat = "identity") +
   ylab("Number of tweets") + xlab("User") +
   coord_flip() +
-  scale_fill_manual(values = wes_palette("Zissou")[c(1, 3)]) +
+  scale_fill_manual(values = wes_palette("Zissou1")[c(1, 3)]) +
   theme(axis.text = element_text(size = 12),
         legend.text = element_text(size = 12))
 ```
@@ -147,7 +147,7 @@ top_orig_users$screen_name <- reorder(top_orig_users$screen_name,
                                      function(x) sum(x))
 
 ggplot(top_orig_users) + geom_bar(aes(x = screen_name, y = Original), stat = "identity",
-                                  fill = wes_palette("Zissou", 1)) +
+                                  fill = wes_palette("Zissou1", 1)) +
   ylab("Number of tweets") + xlab("User") +
   coord_flip() +
   theme(axis.text = element_text(size = 12),
@@ -184,7 +184,7 @@ most_fav$screen_name <- reorder(most_fav$screen_name,
 
 ggplot(most_fav) +
     geom_bar(aes(x = screen_name, y = n_fav),
-             stat = "identity", fill = wes_palette("Zissou")[2]) +
+             stat = "identity", fill = wes_palette("Zissou1")[2]) +
   coord_flip() + xlab("User") + ylab("Total number of favorites") +
   theme(axis.text = element_text(size = 12),
         legend.text = element_text(size = 12))
@@ -204,7 +204,7 @@ most_rt$screen_name <- reorder(most_rt$screen_name,
 
 ggplot(most_rt) +
     geom_bar(aes(x = screen_name, y = n_rt),
-             stat = "identity", fill =  wes_palette("Zissou")[5]) +
+             stat = "identity", fill =  wes_palette("Zissou1")[5]) +
   coord_flip() + xlab("User") + ylab("Total number of retweets") +
   theme(axis.text = element_text(size = 12),
         legend.text = element_text(size = 12))
@@ -225,7 +225,7 @@ hi_mean_fav$screen_name <- reorder(hi_mean_fav$screen_name,
 
 ggplot(hi_mean_fav) +
     geom_bar(aes(x = screen_name, y = mean_fav),
-             stat = "identity", fill = wes_palette("Zissou")[2]) +
+             stat = "identity", fill = wes_palette("Zissou1")[2]) +
   coord_flip() + xlab("User") + ylab("Number of favorites / tweets") +
   theme(axis.text = element_text(size = 12),
         legend.text = element_text(size = 12))
@@ -246,7 +246,7 @@ hi_mean_rt$screen_name <- reorder(hi_mean_rt$screen_name,
                                  sort)
 
 ggplot(hi_mean_rt) + geom_bar(aes(x = screen_name, y = mean_rt),
-                           stat = "identity", fill = wes_palette("Zissou")[5]) +
+                           stat = "identity", fill = wes_palette("Zissou1")[5]) +
   coord_flip() + xlab("User") + ylab("Number of retweets / tweets") +
   theme(axis.text = element_text(size = 12),
         legend.text = element_text(size = 12))
@@ -261,7 +261,7 @@ The top 100 words among the original tweets.
 ```{r word-cloud, echo=FALSE, fig.height=8, fig.width=8, cache=TRUE}
 library(wordcloud)
 
-pal <- wes_palette("Darjeeling", 8, type = "continuous")
+pal <- wes_palette("Darjeeling1", 8, type = "continuous")
 
 tw_text_cleanup <- function(x) {
     x %>%
@@ -343,13 +343,13 @@ emojis %>%
     purrr::pmap(render_row_emoji) %>%
     render_plot
 
- ```
+```
 
 
 ## Most commonly associated words
 
 
-```{r word-pairs, echo=FALSE, fig.width=10}
+```{r word-pairs, echo=FALSE, fig.width=10, eval=FALSE}
 ## From: http://tidytextmining.com/nasa.html#word-co-ocurrences-and-correlations
 evo_stop_words <- data_frame(word = c("evol2017", "rt", "https", "t.co",
                     "amp"))
