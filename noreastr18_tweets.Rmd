@@ -1,5 +1,5 @@
 ---
-title: "USIALE 2018 Tweets"
+title: "Nor'eastR 2018 Tweets"
 author: Jeff Hollister (borrowed from François Michonneau)
 output:
    html_document:
@@ -26,13 +26,13 @@ library(rvest)
 
 ```{r update_tweets, echo=FALSE}
 
-load("usiale2018.rda")
+load("noreastr2018.rda")
 
 ```
 
 ```{r tweet-data, echo=FALSE}
-load("usiale2018.rda")
-tw <- usiale2018 %>%
+load("noreastr2018.rda")
+tw <- noreastr2018 %>%
   distinct(status_id, .keep_all = TRUE)
 
 ```
